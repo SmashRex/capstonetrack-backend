@@ -7,38 +7,40 @@ const PORT = process.env.PORT || 5000
 
 app.use(express.json())
 
+// ── Health Check ─────────────────────────
 app.get('/api/health', (req, res) => {
-    res.status(200).json({
-        "status" : "Ok",
-        "message" : "Server is Running Dey wi me na",
-        "timestamp" : new Date()
-    })
+  res.status(200).json({
+    status: 'OK',
+    message: 'CapstoneTrack API is running',
+    timestamp: new Date().toISOString()   
+  })
 })
 
-app.get('/api/user', (req, res)=> {
-    res.status(200).json({
-        "name" : "Smash",
-        "role" : "Backend Developer",
-        "goal" : "Build Capstone Project"
-    })
+// ── User Info ────────────────────────────
+app.get('/api/user', (req, res) => {
+  res.status(200).json({
+    name: 'Smash',
+    role: 'Backend Developer',
+    goal: 'Build CapstoneTrack'
+  })
 })
 
+// ── Server Time ──────────────────────────
 app.get('/api/time', (req, res) => {
-    res.status(200).json({
-        "time" : new Date().toLocaleTimeString()
-    })
+  res.status(200).json({
+    time: new Date().toLocaleTimeString()
+  })
 })
 
-
-
-app.use((req,res)=>{
-    res.status(404).json({
-        "message" : "Route not found wetin you dey find",
-        "timestamp" : new Date()
-    })
+// ── 404 Handler (MUST be last) ───────────
+app.use((req, res) => {
+  res.status(404).json({
+    message: 'Route not found',           
+    timestamp: new Date().toISOString()   
+  })
 })
 
-app.listen(PORT, ()=>{
-    console.log(`Server is runing on port ${PORT}`);
-    
+// ── Start Server ─────────────────────────
+app.listen(PORT, () => {
+  console.log(`🚀 CapstoneTrack API running on port ${PORT}`)
 })
