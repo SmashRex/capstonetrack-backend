@@ -4,6 +4,12 @@ const app = express()
 
 app.use(express.json())
 
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+
+// Mount routes
+app.use('/api/auth', authRoutes);
+
 // ── Health Check ─────────────────────────
 app.get('/api/health', (req, res) => {
   res.status(200).json({
