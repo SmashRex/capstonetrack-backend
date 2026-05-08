@@ -3,12 +3,19 @@ const express = require('express')
 const app = express()
 
 app.use(express.json())
+const cors = require('cors');
+const  studentsRoutes = require('./routes/studentroutes');
+
+
+
+app.use(cors());
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.use('/api/students', studentsRoutes);
 
 // ── Health Check ─────────────────────────
 app.get('/api/health', (req, res) => {
