@@ -1,21 +1,19 @@
-const express = require('express')
+import express from 'express'
+import cors from 'cors'
+import studentsRoutes from './routes/studentroutes.js'
+import authRoutes from './routes/authRoutes.js'
+import githubRoutes from './routes/githubRoutes.js'
 
 const app = express()
 
 app.use(express.json())
-const cors = require('cors');
-const  studentsRoutes = require('./routes/studentroutes');
+app.use(cors())
 
-
-
-app.use(cors());
-
-// Import routes
-const authRoutes = require('./routes/authRoutes');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentsRoutes);
+app.use('/api/github', githubRoutes);
 
 // ── Health Check ─────────────────────────
 app.get('/api/health', (req, res) => {
@@ -50,4 +48,4 @@ app.use((req, res) => {
   })
 })
 
-module.exports = app
+export default app

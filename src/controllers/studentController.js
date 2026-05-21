@@ -1,11 +1,7 @@
-// 1. Receive the uploaded file from multer
-// 2. Parse the CSV rows
-// 3. For each row — check if examScore >= 80
-// 4. Save qualified students to MongoDB
-// 5. Return summary
 
-const Student = require('../models/student');
-const csv = require('csv-parse/sync')
+
+import Student from '../models/student.js'
+import { parse } from 'csv-parse/sync'
 
 const studentUpload = async (req, res) => {
     if (!req.file) {
@@ -13,7 +9,7 @@ const studentUpload = async (req, res) => {
     }
 
     try {
-        const records = csv.parse(req.file.buffer, {
+        const records = parse(req.file.buffer, {
             columns: true,
             skip_empty_lines: true
         });
@@ -60,4 +56,4 @@ const studentUpload = async (req, res) => {
     }
 };
 
-module.exports = { studentUpload }
+export { studentUpload }

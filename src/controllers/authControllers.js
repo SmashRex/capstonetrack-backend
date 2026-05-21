@@ -1,6 +1,6 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/user');
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import User from '../models/user.js'
 
 const registerUser = async (req, res) => {
     try {
@@ -86,10 +86,9 @@ const loginUser = async (req, res) => {
             }
     }
     } catch (err) {
-        console.error('Login error:', err);
-        res.status(500).json({ message: 'Error while logging in, please try again' });
+        console.error('Login error:', err)
+        res.status(500).json({ message: 'Error while logging in, please try again' })
     }
-
 }
 
-module.exports = { registerUser, loginUser };
+export { registerUser, loginUser }
