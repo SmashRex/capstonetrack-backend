@@ -3,6 +3,7 @@ import cors from 'cors'
 import studentsRoutes from './routes/studentroutes.js'
 import authRoutes from './routes/authRoutes.js'
 import githubRoutes from './routes/githubRoutes.js'
+import groupRoutes from './routes/groupRoutes.js'
 
 const app = express()
 
@@ -14,6 +15,8 @@ app.use(cors())
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentsRoutes);
 app.use('/api/github', githubRoutes);
+app.use('/api/groups', groupRoutes);
+
 
 // ── Health Check ─────────────────────────
 app.get('/api/health', (req, res) => {
