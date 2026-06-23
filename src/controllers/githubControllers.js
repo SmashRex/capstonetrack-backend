@@ -12,7 +12,6 @@ const getGithubProfile = async (req , res) => {
         const response = await axios.get(`https://api.github.com/users/${username}`,
             {headers : githubHeaders}
         )
-
         res.status(200).json({
             username: response.data.login,
             name: response.data.name,

@@ -158,4 +158,5 @@ const getAllGroups = async (req, res) => {
   }
 }
 
+
 export {generateGroups, getAllGroups}

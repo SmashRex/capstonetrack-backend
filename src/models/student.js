@@ -32,6 +32,7 @@ qualified : {
 
 cohort : {
     type:String,
+    required: true
 },
 
 }, { timestamps: true })
