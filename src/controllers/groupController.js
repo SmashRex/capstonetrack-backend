@@ -13,150 +13,194 @@ function shuffleArray(array) {
 }
 
 // ── Generate Groups ───────────────────────
+
 const generateGroups = async (req, res) => {
-  const {cohort} = req.body
+  const { cohort, composition } = req.body;
+  if (!cohort || !composition) {
+    return res.status(400).json({ message: 'Provide composition and cohort' });
+  }
 
   try {
-    const existing = await Team.findOne({ cohort })
-if (existing) {
-  return res.status(400).json({
-    message: 'Groups already generated for this cohort'
-  })
-}
-    
-    // Step 1 — Get qualified students
-    const students = await Student.find({ qualified: true })
-
-    if (students.length === 0) {
-      return res.status(400).json({ 
-        message: 'No qualified students found' 
-      })
+    // Prevent duplicate generation for cohort
+    const existing = await Team.findOne({ cohort });
+    if (existing) {
+      return res.status(400).json({ message: 'Groups already generated for this cohort' });
     }
 
-    // Step 2 — Group by track (ONE consistent name)
-    const studentsByTrack = students.reduce((groups, student) => {
-      const track = student.track
-      if (!groups[track]) groups[track] = []
-      groups[track].push(student)
-      return groups
-    }, {})
+    // Load and shuffle students per track, compute groupsPossible per track
+    const studentsByTrack = {};
+    const groupsPossibleByTrack = {};
 
-    // Step 3 — Shuffle each track
-    Object.keys(studentsByTrack).forEach(track => {
-      studentsByTrack[track] = shuffleArray(studentsByTrack[track])
-    })
-
-    // Step 4 — Find number of balanced groups
-    const trackSizes = Object.values(studentsByTrack).map(arr => arr.length)
-    const numberOfGroups = Math.min(...trackSizes)
-
-    if (numberOfGroups === 0) {
-      return res.status(400).json({ 
-        message: 'Not enough students to form groups' 
-      })
+    for (const [track, count] of Object.entries(composition)) {
+      const students = await Student.find({ track, cohort, qualified: true }).lean();
+      studentsByTrack[track] = shuffleArray(students);
+      groupsPossibleByTrack[track] = Math.floor(studentsByTrack[track].length / count);
     }
 
-    // Step 5 — Build groups
-    const createdGroups = []
+    // Determine numberOfGroups as the minimum across tracks
+    const numberOfGroups = Math.min(...Object.values(groupsPossibleByTrack));
+    if (!numberOfGroups || numberOfGroups === 0 || !isFinite(numberOfGroups)) {
+      return res.status(400).json({ message: 'Not enough students to form groups' });
+    }
+
+    // Create groups and team members
+    const createdGroups = [];
 
     for (let i = 0; i < numberOfGroups; i++) {
-      // Capital Team — no conflict with loop variables
       const newTeam = await Team.create({
         name: `Group ${i + 1}`,
-        cohort: cohort        // ← use what admin sent
-})
+        cohort
+      });
 
+      const members = [];
 
-      const members = []
+      // For each track, assign composition[track] students to this group
+      for (const [track, count] of Object.entries(composition)) {
+        const startIndex = i * count;
+        const assignedSlice = studentsByTrack[track].slice(startIndex, startIndex + count);
 
-      for (const track of Object.keys(studentsByTrack)) {
-        const student = studentsByTrack[track][i]
+        if (assignedSlice.length < count) {
+          // Unexpected shortage; ideally rollback if using transactions
+          return res.status(500).json({ message: 'Unexpected shortage of students while assigning groups' });
+        }
 
-        await TeamMember.create({
-          teamId: newTeam._id,
-          studentId: student._id,
-          name: student.name,
-          track: student.track
-        })
+        // Create TeamMember for each student in the slice
+        for (const student of assignedSlice) {
+          await TeamMember.create({
+            teamId: newTeam._id,
+            studentId: student._id,
+            name: student.name,
+            track: student.track
+          });
 
-        members.push({
-          name: student.name,
-          email: student.email,
-          track: student.track,
-          githubUsername: student.githubUsername
-        })
+          members.push({
+            name: student.name,
+            email: student.email,
+            track: student.track,
+            githubUsername: student.githubUsername
+          });
+        }
       }
 
       createdGroups.push({
         groupName: newTeam.name,
         teamId: newTeam._id,
         members
-      })
+      });
     }
 
-    // Step 6 — Handle unassigned students
-    const unassignedStudents = []
-    Object.keys(studentsByTrack).forEach(track => {
-      const leftovers = studentsByTrack[track].slice(numberOfGroups)
-      leftovers.forEach(student => {
+    // Collect unassigned students (leftovers) per track
+    const unassignedStudents = [];
+    for (const [track, count] of Object.entries(composition)) {
+      const assignedCount = numberOfGroups * count;
+      const leftovers = studentsByTrack[track].slice(assignedCount);
+      for (const student of leftovers) {
         unassignedStudents.push({
           name: student.name,
           email: student.email,
           track: student.track,
           githubUsername: student.githubUsername
-        })
-      })
-    })
+        });
+      }
+    }
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'Groups generated successfully',
       totalGroups: createdGroups.length,
       groups: createdGroups,
       unassignedCount: unassignedStudents.length,
       unassigned: unassignedStudents
-    })
-
+    });
   } catch (err) {
-    console.error('Group generation error:', err)
-    res.status(500).json({ message: 'Error generating groups' })
+    console.error('Group generation error:', err);
+    return res.status(500).json({ message: 'Error generating groups' });
   }
-}
+};
+
 
 
 // ── Get All Groups ────────────────────────
 const getAllGroups = async (req, res) => {
   try {
-    const teams = await Team.find()   // 'teams' plural
+    const { cohort } = req.query; // optional filter
+
+    // If cohort is provided, filter teams by cohort
+    const query = cohort ? { cohort } : {};
+    const teams = await Team.find(query);
 
     const groups = await Promise.all(
-      teams.map(async (team) => {     // 'teams' plural here too
-        const members = await TeamMember.find({
-          teamId: team._id
-        }).populate('studentId', 'name email track githubUsername')
+      teams.map(async (team) => {
+        const members = await TeamMember.find({ teamId: team._id })
+          .populate('studentId', 'name email track githubUsername');
 
         return {
           groupName: team.name,
           teamId: team._id,
+          cohort: team.cohort, // include cohort for clarity
           members: members.map(m => ({
             name: m.studentId.name,
             email: m.studentId.email,
             track: m.track,
             githubUsername: m.studentId.githubUsername
           }))
-        }
+        };
       })
-    )
+    );
 
     res.status(200).json({
+      message: 'Groups fetched successfully',
       totalGroups: groups.length,
-      groups
-    })
+      groups,
+      unassignedCount: 0,   // consistent shape with generateGroups
+      unassigned: []
+    });
 
   } catch (err) {
-    console.error('Get groups error:', err)
-    res.status(500).json({ message: 'Error fetching groups' })
+    console.error('Get groups error:', err);
+    res.status(500).json({ message: 'Error fetching groups' });
   }
-}
+};
+
+// ── Get Single Group ──────────────────────
+const getGroupById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the team by ID
+    const team = await Team.findById(id);
+    if (!team) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    // Fetch members of this team
+    const members = await TeamMember.find({ teamId: team._id })
+      .populate('studentId', 'name email track githubUsername');
+
+    const group = {
+      groupName: team.name,
+      teamId: team._id,
+      cohort: team.cohort,
+      members: members.map(m => ({
+        name: m.studentId.name,
+        email: m.studentId.email,
+        track: m.track,
+        githubUsername: m.studentId.githubUsername
+      }))
+    };
+
+    res.status(200).json({
+      message: 'Group fetched successfully',
+      totalGroups: 1,
+      groups: [group],
+      unassignedCount: 0,   // consistent shape
+      unassigned: []
+    });
+
+  } catch (err) {
+    console.error('Get group error:', err);
+    res.status(500).json({ message: 'Error fetching group' });
+  }
+};
 
 
-export {generateGroups, getAllGroups}
+export {generateGroups, getAllGroups, getGroupById}
