@@ -13,7 +13,6 @@ function shuffleArray(array) {
 }
 
 // ── Generate Groups ───────────────────────
-
 const generateGroups = async (req, res) => {
   const { cohort, composition } = req.body;
   if (!cohort || !composition) {
@@ -118,7 +117,6 @@ const generateGroups = async (req, res) => {
 };
 
 
-
 // ── Get All Groups ────────────────────────
 const getAllGroups = async (req, res) => {
   try {
@@ -203,4 +201,55 @@ const getGroupById = async (req, res) => {
 };
 
 
-export {generateGroups, getAllGroups, getGroupById}
+// ── Add Students to group maually ──────────────────────
+const addStudentToGroup = async (req, res) => {
+  const {teamId} = req.params
+
+  const {studentId} = req.body
+
+  
+
+  try{
+
+  const teamIdExists = await Team.findById(teamId)
+   if(!teamIdExists){
+    return res.status(404).json({
+      message: 'Group not found'
+    })
+  }
+
+  const studentIdExists = await Student.findById(studentId)
+    if(!studentIdExists){
+    return res.status(404).json({
+      message: 'Student not Found'
+    })
+  }
+  const studentAlreadyInAGroup = await TeamMember.findOne({studentId})
+    if(studentAlreadyInAGroup){
+      return res.status(400).json({
+        message:'Student Already in a Group'
+      })
+    }
+
+    await TeamMember.create({
+            teamId,
+            studentId,
+            name: studentIdExists.name,
+            track: studentIdExists.track
+          });
+
+          return res.status(201).json({
+            message: `${studentIdExists.name} has been Added to ${teamIdExists.name} Successfully`,
+            groupName : teamIdExists.name,
+            studentName: studentIdExists.name
+          })
+        } catch(err){
+          return res.status(500).json({
+            message: 'Error adding student'
+          })
+        }
+  
+}
+
+
+export {generateGroups, getAllGroups, getGroupById, addStudentToGroup}
