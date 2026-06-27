@@ -262,5 +262,40 @@ const addStudentToGroup = async (req, res) => {
   
 }
 
+const assignProject = async (req, res)=> {
+// Get teamId from req.params
+const { teamId } = req.params
+// Get project from req.body
+const { project } = req.body
+// Validate both exist
+try{
+if(!teamId || !project){
+    return res.status(400).json({
+        message: 'TeamId And project must be provided'
+    })
+}
+// Convert project name to GitHub-safe format
+const githubSafeName = project.trim()
+                .toLowerCase()
+                .replace(/\s+/g, '-')
 
-export {generateGroups, getAllGroups, getGroupById, addStudentToGroup}
+// Update the Team document
+const updateTeamInfo = await Team.findByIdAndUpdate(teamId, { project: githubSafeName }, { new: true })
+// Return 200 with the updated team info
+return res.status(200).json({
+    message: 'updated successfully',
+    updateTeamInfo
+})
+} catch(err){
+  return res.status(500).json({
+    message: 'Error assigning project'
+  })
+}
+}
+
+
+export { generateGroups,
+          getAllGroups,
+          getGroupById,
+          addStudentToGroup,
+          assignProject }

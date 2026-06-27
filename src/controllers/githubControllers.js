@@ -94,5 +94,28 @@ const getGithubCommits = async (req, res) => {
     
 }
 
+const getGroupHealth = async (req, res) => {
+// Get teamId from req.params 
+const {teamId} = req.params
+// Validate both exist
+if(!teamId){
+    res.status(400).json({
+        message: 'No Team ID'
+    })
+}
 
-export  { getGithubProfile,getGithubRepos,getGithubCommits }
+// Find all TeamMembers where teamId matches
+const thatTeam = await TeamMembers.findbyId()
+// For each member, populate their studentId to get githubUsername
+// For each student, call GitHub API to get their commits on that repo
+// Calculate days since their last commit
+// Flag if inactive 5+ days
+// Flag if any commit has 500+ lines changed
+// Calculate overall group health — green, yellow, red
+// Return all members with their stats plus the group health score
+}
+
+
+
+export  { getGithubProfile,getGithubRepos,getGithubCommits, getGroupHealth }
+
