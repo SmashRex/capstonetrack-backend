@@ -1,7 +1,7 @@
 import Student from "../models/student.js"
 import Team from "../models/team.js"
 import TeamMember from "../models/teamMember.js"
-
+import { sendGroupEmail, sleep } from "../utils/emailSystem.js"
 
 // ── Fisher-Yates Shuffle ──────────────────
 function shuffleArray(array) {
@@ -102,6 +102,17 @@ const generateGroups = async (req, res) => {
         });
       }
     }
+
+
+    for (const group of createdGroups) {
+  for (const member of group.members) {
+    const teammates = group.members.filter(m => m.email !== member.email)
+    // call sendGroupEmail here
+    await sendGroupEmail(member.name, member.email, group.groupName,teammates, 'https://github.com/capstonetrack')
+
+    await sleep(300)
+  }
+}
 
     return res.status(201).json({
       message: 'Groups generated successfully',
