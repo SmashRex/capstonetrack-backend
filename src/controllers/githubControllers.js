@@ -126,7 +126,7 @@ const createRepo = await axios.post(
   { headers: githubHeaders }
 )
 // Get all TeamMembers for this team → populate studentId to get githubUsername
-const members = await TeamMember.find({ teamId: teamDetails._id }).populate('studentId', 'githubUsername')
+const members = await TeamMember.find({ teamId: teamDetails._id }).populate('studentId', 'name githubUsername')
 // For each member, call GitHub API to add them as collaborator
    for (const member of members) {
   const username = member.studentId.githubUsername;
@@ -163,26 +163,99 @@ return res.status(201).json({
 
 
 const getGroupHealth = async (req, res) => {
-// Get teamId from req.params 
+// Get teamId from req.params
 const {teamId} = req.params
-// Validate both exist
-if(!teamId){
-    res.status(400).json({
-        message: 'No Team ID'
+
+try{
+// Find the team — get project for the repo name
+const team = await Team.findById(teamId)
+if(!team) return res.status(404).json({ 
+    message: 'Team not found' 
+})
+
+// Check team.project exists — 400 if not
+if(!team.project){
+    return res.status(400).json({
+        message:'project shouldnt be empty or null'
+    })
+}
+// Get all members with githubUsername
+const members = await TeamMember.find({ teamId: team._id }).populate('studentId', 'name githubUsername')
+
+// For each member, call GitHub API to get commits on that repo
+const memberStats = []
+
+for(const member of members){
+    const username = member.studentId.githubUsername;
+  if(!username) continue;
+
+try{
+    const response = await axios.get(`https://api.github.com/repos/${process.env.GITHUB_ORG}/${team.project}/commits?per_page=10`, 
+        {headers:githubHeaders})
+
+    const commits = response.data.map(commit=>({
+            message: commit.commit.message,
+            author:commit.commit.author.name,
+            date: commit.commit.author.date,
+            sha:commit.sha.substring(0,7)
+        }))
+
+        // Calculate days since last commit
+const lastCommitDate = new Date(commits[0].date)
+const today = new Date()
+const diffInMs = today - lastCommitDate
+const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
+// Flag inactive if 5+ days
+const inactive = diffInDays > 5
+
+    memberStats.push({
+      name: member.studentId.name,
+      username,
+      lastCommitDaysAgo: diffInDays,
+      inactive,
+      commits
+    })
+  } catch(err) {
+    // handle member with no commits or invalid username
+    memberStats.push({
+      name: member.studentId.name,
+      username,
+      lastCommitDaysAgo: null,
+      inactive: true,
+      commits: []
+    })
+  }
+
+}
+
+// Calculate health score
+const inactiveCount = memberStats.filter(m => m.inactive).length
+const totalMembers = memberStats.length
+
+let healthScore
+if (inactiveCount === 0) {
+  healthScore = 'green'
+} else if (inactiveCount > totalMembers / 2) {
+  healthScore = 'red'
+} else {
+  healthScore = 'yellow'
+}
+// Return results
+return res.status(200).json({
+    message: 'Health score retrieved',
+    healthScore,
+    totalMembers,
+    inactiveCount,
+    members: memberStats
+})
+
+}catch(err){
+    return res.status(500).json({
+        message: 'Error getting Group Health'
     })
 }
 
-// Find all TeamMembers where teamId matches
-const thatTeam = await TeamMembers.findbyId()
-// For each member, populate their studentId to get githubUsername
-// For each student, call GitHub API to get their commits on that repo
-// Calculate days since their last commit
-// Flag if inactive 5+ days
-// Flag if any commit has 500+ lines changed
-// Calculate overall group health — green, yellow, red
-// Return all members with their stats plus the group health score
 }
-
 
 
 export  { getGithubProfile,getGithubRepos,getGithubCommits, getGroupHealth, gitRepoCreation }
