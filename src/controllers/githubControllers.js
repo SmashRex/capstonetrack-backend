@@ -1,5 +1,7 @@
 import axios from 'axios'
 import User from '../models/user.js'
+import Team from '../models/team.js'
+import TeamMember from '../models/teamMember.js'
 
 const githubHeaders = {
     Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
@@ -94,6 +96,72 @@ const getGithubCommits = async (req, res) => {
     
 }
 
+
+const gitRepoCreation = async (req,res) => {
+// Get teamId from req.params
+const {teamId} = req.params
+// Find the Team document to get project and cohort
+try{
+if(!teamId){
+    return res.status(400).json({
+        message: 'Team Id Needed'
+    })
+}
+const teamDetails = await Team.findById(teamId)
+if(!teamDetails){
+    return res.status(400).json({
+        message: 'Team not Found'
+    })
+}
+// Check that team.project exists — can't create a repo with no name
+if(!teamDetails.project){
+    return res.status(400).json({
+        message: 'project name needs to be provided'
+    })
+}
+
+const createRepo = await axios.post(
+  `https://api.github.com/orgs/${process.env.GITHUB_ORG}/repos`,
+  { name: teamDetails.project, private: false, auto_init: true },
+  { headers: githubHeaders }
+)
+// Get all TeamMembers for this team → populate studentId to get githubUsername
+const members = await TeamMember.find({ teamId }).populate('studentId', 'githubUsername')
+// For each member, call GitHub API to add them as collaborator
+   for (const member of members) {
+  const username = member.studentId.githubUsername;
+  if(!username) continue;
+  try {
+    await axios.put(
+      `https://api.github.com/repos/${process.env.GITHUB_ORG}/${teamDetails.project}/collaborators/${username}`,
+      {},
+      { headers: githubHeaders }
+    )
+  } catch(collaboratorErr) {
+    console.warn(`Could not add ${username} as collaborator:`, collaboratorErr.response?.data?.message)
+  }
+}
+// Store the repo URL on the Team document → team.repoUrl
+ const gitrepoURL = await Team.findByIdAndUpdate(teamId, {repoUrl: createRepo.data.html_url }, {new: true})
+ 
+
+// Return 201 with repo URL and collaborators added
+return res.status(201).json({
+    message: 'Add Collaborators',
+    repoURL: gitrepoURL.repoUrl,
+    collaborators: members.map(m => m.studentId.githubUsername)
+})
+
+} catch(err){
+    console.error('Repo creation error:', err.response?.data || err.message)
+    return res.status(500).json({
+        message: 'Error Creating Repo'
+    })
+}
+}
+
+
+
 const getGroupHealth = async (req, res) => {
 // Get teamId from req.params 
 const {teamId} = req.params
@@ -117,5 +185,5 @@ const thatTeam = await TeamMembers.findbyId()
 
 
 
-export  { getGithubProfile,getGithubRepos,getGithubCommits, getGroupHealth }
+export  { getGithubProfile,getGithubRepos,getGithubCommits, getGroupHealth, gitRepoCreation }
 

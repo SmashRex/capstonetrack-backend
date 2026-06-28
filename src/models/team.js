@@ -12,6 +12,10 @@ const teamSchema = new mongoose.Schema({
     project:{
         type:String,
         default: null
+    },
+    repoUrl: { 
+        type: String, 
+        default: null 
     }
 },{
     timestamps:true
