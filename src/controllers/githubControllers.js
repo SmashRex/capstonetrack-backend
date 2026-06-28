@@ -126,7 +126,7 @@ const createRepo = await axios.post(
   { headers: githubHeaders }
 )
 // Get all TeamMembers for this team → populate studentId to get githubUsername
-const members = await TeamMember.find({ teamId }).populate('studentId', 'githubUsername')
+const members = await TeamMember.find({ teamId: teamDetails._id }).populate('studentId', 'githubUsername')
 // For each member, call GitHub API to add them as collaborator
    for (const member of members) {
   const username = member.studentId.githubUsername;
